@@ -1,10 +1,8 @@
 /**************************************************************
-* Class:  CSC-415-0#  Fall 2021
-* Names: 
-* Student IDs:
-* GitHub Name:
-* Group Name:
-* Project: Basic File System
+* Class:  CSC-415
+* Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
+* Student IDs: 920290979, 920757003, 920875901, 922033512
+* Project: Basic File System 
 *
 * File: b_io.h
 *
