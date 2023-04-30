@@ -1,10 +1,8 @@
 /**************************************************************
-* Class:  CSC-415-0# Fall 2021
-* Names: 
-* Student IDs:
-* GitHub Name:
-* Group Name:
-* Project: Basic File System
+* Class:  CSC-415
+* Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
+* Student IDs: 920290979, 920757003, 920875901, 922033512
+* Project: Basic File System 
 *
 * File: b_io.c
 *
@@ -19,18 +17,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <pthread.h>
+
 #include "b_io.h"
+#include "mfs.h"
 
 #define MAXFCBS 20
 #define B_CHUNK_SIZE 512
 
+// static mutex for only b_io to avoid race condition
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 typedef struct b_fcb
-	{
-	/** TODO add al the information you need in the file control block **/
-	char * buf;		//holds the open file buffer
-	int index;		//holds the current position in the buffer
-	int buflen;		//holds how many valid bytes are in the buffer
-	} b_fcb;
+{
+	int fs_FD;		 // holds the systems file descriptor
+	char *buf;		 // holds the open file buffer
+	uint64_t index;	 // holds the current position in the buffer
+	uint64_t buflen; // holds how many valid bytes are in the buffer
+	fdDir *parent;	 // holds the parent directory of the file
+	char *fileName;	 // holds the true file name not the path
+	int b_flags;	 // holds the functionality of the method
+} b_fcb;
 	
 b_fcb fcbArray[MAXFCBS];
 
@@ -53,7 +60,7 @@ b_io_fd b_getFCB ()
 	{
 	for (int i = 0; i < MAXFCBS; i++)
 		{
-		if (fcbArray[i].buff == NULL)
+		if (fcbArray[i].buf == NULL)
 			{
 			return i;		//Not thread safe (But do not worry about it for this assignment)
 			}
@@ -64,56 +71,193 @@ b_io_fd b_getFCB ()
 // Interface to open a buffered file
 // Modification of interface for this assignment, flags match the Linux flags for open
 // O_RDONLY, O_WRONLY, or O_RDWR
-b_io_fd b_open (char * filename, int flags)
-	{
+b_io_fd b_open(char * filename, int flags)
+{
 	b_io_fd returnFd;
 
-	//*** TODO ***:  Modify to save or set any information needed
-	//
-	//
-		
-	if (startup == 0) b_init();  //Initialize our system
-	
-	returnFd = b_getFCB();				// get our own file descriptor
-										// check for error - all used FCB's
-	
-	return (returnFd);						// all set
+	if (startup == 0)
+		b_init(); // Initialize our system
+
+	pthread_mutex_lock(&mutex);
+
+	// get fd
+	returnFd = b_getFCB();
+
+	fcbArray[returnFd].fs_FD = returnFd; // save the fd
+
+	pthread_mutex_unlock(&mutex);
+
+	// question: user may input a path instead of a filename
+	// what we are trying to do is to figure out both condition:
+	// path and filename
+	char *pathExculdeSlash;
+
+	pathExculdeSlash = malloc(strlen(filename) + 1);
+
+	if (pathExculdeSlash == NULL)
+	{
+		printf("[b_io.c -- b_open] malloc pathExculdeSlash failed\n");
+		return -1;
 	}
 
+	strcpy(pathExculdeSlash, filename);
+	fcbArray[returnFd].fileName = get_path_last_slash(pathExculdeSlash);
+	// printf("filename we get: %s\n", fcbArray[fd].fileName);
 
-// Interface to seek function	
-int b_seek (b_io_fd fd, off_t offset, int whence)
+	// check if the filename we get is nothing, we need end up this function and return error
+	if (strcmp(fcbArray[returnFd].fileName, "") == 0)
 	{
-	if (startup == 0) b_init();  //Initialize our system
+		printf("fileName should not be empty\n");
+		fcbArray[returnFd].fs_FD = -2; // means get fd failed
+		free(pathExculdeSlash);
+		pathExculdeSlash = NULL;
+		return -2;
+	}
+
+	// get the dir path and set up it to its parent directory
+	fcbArray[returnFd].parent = parsePath(pathExculdeSlash);
+
+	// check if the parent directory stored successfully
+	if (fcbArray[returnFd].parent == NULL)
+	{
+		fcbArray[returnFd].fs_FD = -2; // means get fd failed
+		free(pathExculdeSlash);
+		pathExculdeSlash = NULL;
+		return -2;
+	}
+
+	// check if the filename is a file --> contains "." inside of the name
+	// printf("get parent name: %s\n", fcbArray[fd].parent->d_name);
+	int check = 0;
+	// 20 is the maximum number of the character in fcbArray[fd].fileName[20]
+	for (int i = 0; i < strlen(fcbArray[returnFd].fileName); i++)
+	{
+		if (fcbArray[returnFd].fileName[i] == '.') // test2.txt
+		{
+			check = 1;
+			break;
+		}
+	}
+
+	// if check == 1, means fileName is a file name not dir name
+	if (check == 1)
+	{
+		fs_mkFile(fcbArray[returnFd].fileName, 0777);
+	}
+
+	// set out fcbArray[free_fcb_element] become 0 avoid error
+	// since we finished the open and
+	// we may store ohter value insdie of this array
+	fcbArray[returnFd].buflen = 0;
+	fcbArray[returnFd].index = 0;
+	fcbArray[returnFd].b_flags = 0;
+
+	free(pathExculdeSlash);
+	pathExculdeSlash = NULL;
+
+	return (returnFd); // all set
+}
+
+
+// Interface to seek function
+int b_seek(b_io_fd fd, off_t offset, int whence)
+{
+	if (startup == 0)
+		b_init(); // Initialize our system
 
 	// check that fd is between 0 and (MAXFCBS-1)
 	if ((fd < 0) || (fd >= MAXFCBS))
-		{
-		return (-1); 					//invalid file descriptor
-		}
-		
-		
-	return (0); //Change this
+	{
+		return (-1); // invalid file descriptor
 	}
+
+	printf("fd: %d, offset: %d, whence: %d\n", fd, offset, whence);
+
+	return (0); // Change this
+}
 
 
 
 // Interface to write function	
 int b_write (b_io_fd fd, char * buffer, int count)
 	{
-	if (startup == 0) b_init();  //Initialize our system
+	
+	if (startup == 0)
+		b_init(); // Initialize our system
 
-	// check that fd is between 0 and (MAXFCBS-1)
-	if ((fd < 0) || (fd >= MAXFCBS))
-		{
-		return (-1); 					//invalid file descriptor
-		}
-		
-		
-	return (0); //Change this
+	if ((fd < 0) || (fd >= MAXFCBS) || fcbArray[fd].fs_FD == -1 || count < 0)
+	{
+		return (-1);
 	}
 
+	// initialize the detector the first time it calls this function
+	if (fcbArray[fd].b_flags == 0)
+	{
+		fcbArray[fd].b_flags = 2; // set become 2 means write, and 1 means read
 
+		// check if there is no more place to store files in parent directory
+		if (fcbArray[fd].parent->dirEntryPosition >= MAX_ENTRIES_NUMBER)
+		{
+			fcbArray[fd].fs_FD = -2;
+			return -1;
+		}
+
+		// check if there is already a same name of file
+		for (int i = 0; i < MAX_ENTRIES_NUMBER; i++)
+		{
+			if (fcbArray[fd].parent->dirEntry[i].dirUsed == SPACE_IN_USED &&
+				strcmp(fcbArray[fd].parent->dirEntry[i].file_name, fcbArray[fd].fileName) == 0)
+			{
+				printf("\nsame name of directory or file existed\n");
+				fcbArray[fd].fs_FD = -2;
+				return -1;
+			}
+		}
+
+		// allocate the buffer with the first size
+		fcbArray[fd].buf = malloc(B_CHUNK_SIZE);
+		if (fcbArray[fd].buf == NULL)
+		{
+			printf("malloc() on fcbArray[returnFd].buf");
+			fcbArray[fd].fs_FD = -2;
+			return -1;
+		}
+		fcbArray[fd].buflen += B_CHUNK_SIZE;
+	}
+
+	// it shouldn't do another functionality
+	if (fcbArray[fd].b_flags != 2) // check if the b_flags is present to write
+	{
+		// printf("no mix use of functionality!");
+		return -1;
+	}
+
+	// if it just reaches EOF, we skip the copy process
+	// this is a rare case for file with mutiples of the buffer sizes
+	if (count != 0)
+	{
+		// calculate the index to determine realloc()
+		uint64_t newIndex = fcbArray[fd].index + count;
+		if (newIndex > fcbArray[fd].buflen)
+		{
+			// realloc() with the new length
+			fcbArray[fd].buflen += B_CHUNK_SIZE;
+			fcbArray[fd].buf = realloc(fcbArray[fd].buf, fcbArray[fd].buflen);
+			if (fcbArray[fd].buf == NULL)
+			{
+				printf("realloc() on fcbArray[argfd].buf");
+				return -1;
+			}
+		}
+
+		// copy into our buffer and set the new index
+		memcpy(fcbArray[fd].buf + fcbArray[fd].index, buffer, count);
+		fcbArray[fd].index = newIndex;
+	}
+
+	return 0;
+
+}
 
 // Interface to read a buffer
 
@@ -134,22 +278,123 @@ int b_write (b_io_fd fd, char * buffer, int count)
 //  |             |                                                |        |
 //  | Part1       |  Part 2                                        | Part3  |
 //  +-------------+------------------------------------------------+--------+
-int b_read (b_io_fd fd, char * buffer, int count)
-	{
+int b_read(b_io_fd fd, char * buffer, int count)
+{
+	if (startup == 0)
+		b_init(); // Initialize our system
 
-	if (startup == 0) b_init();  //Initialize our system
+	if ((fd < 0) || (fd >= MAXFCBS) || fcbArray[fd].fs_FD == -1 || count < 0)
+	{
+		printf("[b_io -- b_read] conidtion error\n");
+		return (-1); 					//invalid file descriptor
+	}
 
 	// check that fd is between 0 and (MAXFCBS-1)
-	if ((fd < 0) || (fd >= MAXFCBS))
+	// also check if the fd value in the fcbArray is not -1 and the count is not less than 0
+	if (fcbArray[fd].b_flags == 0)
+	{
+		fcbArray[fd].b_flags = 1; // set become 1 means read, and 2 means write
+		int indexHolder = -1;
+		for (int i = 0; i < MAX_ENTRIES_NUMBER; i++)
 		{
-		return (-1); 					//invalid file descriptor
+			// check if it's parent directory is used
+			// check if the parent directory's file type is file nor dir
+			// check if the parent name is the same as the file name we have in the fileName
+			// condition should be all checked to make sure we are on the right track
+			if (fcbArray[fd].parent->dirEntry[i].dirUsed == SPACE_IN_USED &&
+				fcbArray[fd].parent->dirEntry[i].fileType == FILE_TYPE &&
+				strcmp(fcbArray[fd].parent->dirEntry[i].file_name, fcbArray[fd].fileName) == 0)
+			{
+				indexHolder = i; // keep i's value used later to check
+				// set up the buffer length become the exactly dirEntry's file size
+				fcbArray[fd].buflen = fcbArray[fd].parent->dirEntry[i].fileSize;
+				// get the total block count we need
+				// and we have to set up the b_io buffer size, and vcb same avoid the error
+				int blockCount = getVCB_BlockCount(fcbArray[fd].buflen);
+				fcbArray[fd].buf = malloc(blockCount * B_CHUNK_SIZE);
+
+				// check if the buff malloc is successful
+				if (fcbArray[fd].buf == NULL)
+				{
+					printf("[b_io.c -- b_read] fcbArray[fd].buf malloc failed\n");
+					fcbArray[fd].fs_FD = -2;
+					return -1;
+				}
+
+				// read data into our fcbArray[fd].buf by using LBAread
+				LBAread(fcbArray[fd].buf, blockCount, fcbArray[fd].parent->dirEntry[i].dir_Location);
+
+				// after we finish the read data, we simply break out of the loop
+				break;
+			}
 		}
-		
-	return (0);	//Change this
+
+		// handle error of not find files
+		if (indexHolder == MAX_ENTRIES_NUMBER)
+		{
+			printf("[b_io.c -- b_read] indexHolder is out of range\n");
+			return -1;
+		}
 	}
+
+	// check if the b_flags is set to become 1 -> READ
+	if (fcbArray[fd].b_flags != 1)
+	{
+		printf("[b_io.c -- b_read] fcbArray[fd].b_flags is not set up to READ -> 1\n");
+		return -1;
+	}
+
+	int readed = 0; // hold the number of bytes readed into the buffer
+	uint64_t remain = fcbArray[fd].buflen - fcbArray[fd].index;
+
+	// check remain is bigger than 0
+	// which means we still need read data
+	if (remain > 0)
+	{
+		if (remain < count) // if true, means this is the last time of read
+		{
+			readed = remain; // store the number of bytes remainning into the readed
+		}
+		else // if false, means we have to keep offset and run read function again
+		{
+			readed = count;
+		}
+
+		// copy the number of readed data into the buffer at this time
+		memcpy(buffer, fcbArray[fd].buf + fcbArray[fd].index, readed);
+
+		// update the index location since we may run b_read function again
+		fcbArray[fd].index += readed;
+	}
+
+	return readed; // return the number of bytes readed
+}
 	
 // Interface to Close the file	
-int b_close (b_io_fd fd)
+// should close by using file descriptor and set the space become free
+int b_close(b_io_fd fd)
+{
+	// check for some error that return a invalid fd
+	// must handle memory leak above (no time to optimize better)
+	if (fcbArray[fd].fs_FD != -1 && fcbArray[fd].fs_FD != -2)
 	{
-
+		// free all associated malloc() pointer
+		if (fcbArray[fd].buf != NULL)
+		{
+			free(fcbArray[fd].buf);
+			fcbArray[fd].buf = NULL;
+		}
+		if (fcbArray[fd].parent != NULL)
+		{
+			free(fcbArray[fd].parent);
+			fcbArray[fd].parent = NULL;
+		}
+		if (fcbArray[fd].fileName != NULL)
+		{
+			free(fcbArray[fd].fileName);
+			fcbArray[fd].fileName = NULL;
+		}
 	}
+	fcbArray[fd].fs_FD = -1;
+	return 0;
+}

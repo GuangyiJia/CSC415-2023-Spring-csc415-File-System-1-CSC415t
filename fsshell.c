@@ -1,10 +1,8 @@
 /**************************************************************
-* Class:  CSC-415-0# - Fall 2022
-* Names: 
-* Student IDs:
-* GitHub Name:
-* Group Name:
-* Project: Basic File System
+* Class:  CSC-415
+* Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
+* Student IDs: 920290979, 920757003, 920875901, 922033512
+* Project: Basic File System 
 *
 * File: fsShell.c
 *
@@ -27,6 +25,8 @@
 
 #include "fsLow.h"
 #include "mfs.h"
+#include "b_io.h"
+// #include "b_io.c"
 
 #define PERMISSIONS (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 
@@ -36,17 +36,17 @@
 #define DIRMAX_LEN		4096
 
 /****   SET THESE TO 1 WHEN READY TO TEST THAT COMMAND ****/
-#define CMDLS_ON	0
-#define CMDCP_ON	0
-#define CMDMV_ON	0
-#define CMDMD_ON	0
-#define CMDRM_ON	0
-#define CMDCP2L_ON	0
-#define CMDCP2FS_ON	0
-#define CMDCD_ON	0
-#define CMDPWD_ON	0
-#define CMDTOUCH_ON	0
-#define CMDCAT_ON	0
+#define CMDLS_ON	1
+#define CMDCP_ON	1
+#define CMDMV_ON	1
+#define CMDMD_ON	1
+#define CMDRM_ON	1
+#define CMDCP2L_ON	1
+#define CMDCP2FS_ON	1
+#define CMDCD_ON	1
+#define CMDPWD_ON	1
+#define CMDTOUCH_ON	1
+#define CMDCAT_ON	1
 
 
 typedef struct dispatch_t
@@ -63,7 +63,6 @@ int cmd_mv (int argcnt, char *argvec[]);
 int cmd_md (int argcnt, char *argvec[]);
 int cmd_rm (int argcnt, char *argvec[]);
 int cmd_touch (int argcnt, char *argvec[]);
-int cmd_cat (int argcnt, char *argvec[]);
 int cmd_cp2l (int argcnt, char *argvec[]);
 int cmd_cp2fs (int argcnt, char *argvec[]);
 int cmd_cd (int argcnt, char *argvec[]);
@@ -78,7 +77,6 @@ dispatch_t dispatchTable[] = {
 	{"md", cmd_md, "Make a new directory"},
 	{"rm", cmd_rm, "Removes a file or directory"},
         {"touch",cmd_touch, "Touches/Creates a file"},
-        {"cat", cmd_cat, "Limited version of cat that displace the file to the console"},
 	{"cp2l", cmd_cp2l, "Copies a file from the test file system to the linux file system"},
 	{"cp2fs", cmd_cp2fs, "Copies a file from the Linux file system to the test file system"},
 	{"cd", cmd_cd, "Changes directory"},
@@ -263,54 +261,6 @@ int cmd_touch (int argcnt, char *argvec[])
         return 0;
         }
 
-
-/***************************************************
-* Cat Command
-***************************************************/
-
-int cmd_cat (int argcnt, char *argvec[])
-        {
-#if (CMDCAT_ON == 1)     
-        int testfs_src_fd;
-        char * src;
-        int readcnt;
-        char buf[BUFFERLEN];
-
-        switch (argcnt)
-                {
-                case 2: //only one name provided
-                        src = argvec[1];
-                        break;
-
-                default:
-                        printf("Usage: cat srcfile\n");
-                        return (-1);
-                }
-
-
-        testfs_src_fd = b_open (src, O_RDONLY);
-
-        if (testfs_src_fd < 0)
-            {
-	    printf ("Failed to open file system file: %s\n", src);
-            return (testfs_src_fd);
-            }
-
-
-        do 
-                {
-                readcnt = b_read (testfs_src_fd, buf, BUFFERLEN-1);
-                buf[readcnt] = '\0';
-                printf("%s", buf);
-                } while (readcnt == BUFFERLEN);
-        b_close (testfs_src_fd);
-#endif
-        return 0;
-        }
-
-
-
-
 /****************************************************
 *  Copy file commmand
 ****************************************************/
@@ -362,8 +312,195 @@ int cmd_cp (int argcnt, char *argvec[])
 int cmd_mv (int argcnt, char *argvec[])
 	{
 #if (CMDMV_ON == 1)				
-	return -99;
 	// **** TODO ****  For you to implement	
+	// 1. To Move Files to a Directory Maintaining Original File Names
+	// 2. To Move and Rename a File or Directory
+	// mv test1.txt test3.txt
+
+	// for (int i = 0; i < strlen(argvec); i++)
+	// {
+	// 	printf("%d : %s\n", i, argvec[i]);
+	// }
+	// 0 : mv
+	// 1 : test1.txt
+	// 2 : test4.txt
+	
+	// firstly, we have to check if the user only input one filename
+	// suchas: mv test1.txt
+	// in this way we can do nothing things the arguments isn't finished
+	// correct example: mv test1.txt h       		mv test1.txt test2.txt
+	// 					move test1.txt to h dir   	move test1.txt beocme test2.txt in same dir
+	// printf("argvec[2]: %s\n", argvec[2]);
+	if (argvec[2] == NULL)
+	{
+		printf("please enter a whole argument \nfor example: mv [filename] [dir name/filename]\n");
+		return 0;
+	}
+
+	// move to another dir
+	if (fs_isDir(argvec[2]))
+	{
+		// printf("check is Dir\n");
+		
+		char * src;
+		char * dest;
+		int testfs_src_fd;
+		int testfs_dest_fd;
+		int readcnt;
+		char buf[BUFFERLEN];
+
+		src = argvec[1]; // test1.txt
+		// dest = argvec[2]; // h (dir)
+
+		// printf("debug test1\n");
+		testfs_src_fd = b_open (src, O_RDONLY);
+		// testfs_dest_fd = b_open (dest, O_WRONLY | O_CREAT | O_TRUNC);	
+		// printf("debug test2\n");
+		// cd to argvec[2] dir
+		char * path = argvec[2];	//argument
+	
+		if (path[0] == '"')
+		{
+			if (path[strlen(path)-1] == '"')
+			{
+			//remove quotes from string
+			path = path + 1;
+			path[strlen(path) - 1] = 0;
+			}
+		}
+		// printf("debug test3\n");
+		// printf("before keep\n");
+		char * dir_buf = malloc (DIRMAX_LEN +1);
+		char * cwd_keep;
+		cwd_keep = fs_getcwd(dir_buf, DIRMAX_LEN);
+		// free(dir_buf);
+		// dir_buf = NULL;
+		// printf("cwd_keep: %s\n", cwd_keep);
+		int ret = fs_setcwd (path);
+		if (ret != 0)	//error
+		{
+			printf ("Could not change path to %s\n", path);
+			return (ret);
+		}
+
+		// printf("check contain file\n");
+		// check if the new dir already exists the same name file
+		if (checkContainFile(argvec[1]))
+		{
+			printf("File: %s already exists in directory: %s\n", argvec[1], argvec[2]);
+			// return back to the previous directory
+			// go back to the original directory
+			if (cwd_keep[strlen(cwd_keep)-1] == '/')
+			{
+				cwd_keep[strlen(cwd_keep)-1] = '\0';
+			}
+			// printf("cwd_keep before add dot: %s\n", cwd_keep);
+			if (strcmp(cwd_keep, ".") == 0)  // ./h
+			{
+				strcat(cwd_keep, ".");
+				// printf("cwd_keep after add dot: %s\n", cwd_keep);
+				fs_setcwd(cwd_keep);
+			}
+			free(dir_buf);
+			dir_buf = NULL;
+			cwd_keep = NULL;
+			return 0;
+		} else 
+		{
+			// make a new file in the diirectory we go to
+			testfs_dest_fd = fs_mkFile(argvec[1], 0777);
+		}
+		// printf("checkContainFile(argvec[1]): %d", checkContainFile(argvec[1]));
+
+		do 
+		{
+			// read argvec[1] file
+			readcnt = b_read (testfs_src_fd, buf, BUFFERLEN);
+
+			// wrtie a new file copied from argvec[1]
+			b_write (testfs_dest_fd, buf, readcnt);
+			} while (readcnt == BUFFERLEN);
+
+		b_close (testfs_src_fd);
+		b_close (testfs_dest_fd);
+
+		// go back to the original directory
+		if (cwd_keep[strlen(cwd_keep)-1] == '/')
+		{
+			cwd_keep[strlen(cwd_keep)-1] = '\0';
+		}
+		// printf("cwd_keep before add dot: %s\n", cwd_keep);
+		if (strcmp(cwd_keep, ".") == 0)  // ./h
+		{
+			strcat(cwd_keep, ".");
+			// printf("cwd_keep after add dot: %s\n", cwd_keep);
+			fs_setcwd(cwd_keep);
+		}
+		free(dir_buf);
+		dir_buf = NULL;
+		cwd_keep = NULL;
+
+		// // inside another dir to copy
+		// char * temp = fs_getcwd(dir_buf, DIRMAX_LEN);
+		// printf("temp = %s\n", temp);
+		// // free(dir_buf);
+		// // dir_buf = NULL;
+		// char * dot;
+		// strcat(dot, "..");
+
+		// if (strcmp(temp, cwd_keep) != 0)
+		// {
+		// 	// if (dot[0] == '"')
+		// 	// {
+		// 	// 	if (dot[strlen(dot)-1] == '"')
+		// 	// 	{
+		// 	// 	//remove quotes from string
+		// 	// 	dot = dot + 1;
+		// 	// 	dot[strlen(dot) - 1] = 0;
+		// 	// 	}
+		// 	// }
+		// 	printf("insdie if statement\n");
+		// 	// fs_setcwd("..");
+		// }
+
+		// delete the previous file
+		fs_delete(argvec[1]);
+
+		// free(dir_buf);
+		// dir_buf = NULL;
+	}
+	
+	if (!fs_isDir(argvec[2]))
+	{
+		printf("check is not Dir\n");
+		// rename a file
+		// do same thing as cmd_cp
+		char * src;
+		char * dest;
+		int testfs_src_fd;
+		int testfs_dest_fd;
+		int readcnt;
+		char buf[BUFFERLEN];
+
+		src = argvec[1];
+		dest = argvec[2];
+
+		testfs_src_fd = b_open (src, O_RDONLY);
+		testfs_dest_fd = b_open (dest, O_WRONLY | O_CREAT | O_TRUNC);	
+
+		do 
+			{
+			readcnt = b_read (testfs_src_fd, buf, BUFFERLEN);
+			b_write (testfs_dest_fd, buf, readcnt);
+			} while (readcnt == BUFFERLEN);
+		b_close (testfs_src_fd);
+		b_close (testfs_dest_fd);
+
+		// delete the previous file
+		fs_delete(argvec[1]);
+	}
+
+	return -99;
 #endif
 	return 0;
 	}
@@ -421,45 +558,45 @@ int cmd_rm (int argcnt, char *argvec[])
 *  Copy file from test file system to Linux commmand
 ****************************************************/
 int cmd_cp2l (int argcnt, char *argvec[])
-	{
-#if (CMDCP2L_ON == 1)				
+{
+#if (CMDCP2L_ON == 1)
 	int testfs_fd;
 	int linux_fd;
-	char * src;
-	char * dest;
+	char *src;
+	char *dest;
 	int readcnt;
 	char buf[BUFFERLEN];
-	
+
 	switch (argcnt)
-		{
-		case 2:	//only one name provided
-			src = argvec[1];
-			dest = src;
-			break;
-			
-		case 3:
-			src = argvec[1];
-			dest = argvec[2];
-			break;
-		
-		default:
-			printf("Usage: cp2l srcfile [Linuxdestfile]\n");
-			return (-1);
-		}
-	
-	
-	testfs_fd = b_open (src, O_RDONLY);
-	linux_fd = open (dest, O_WRONLY | O_CREAT | O_TRUNC, PERMISSIONS);
-	do 
-		{
-		readcnt = b_read (testfs_fd, buf, BUFFERLEN);
-		write (linux_fd, buf, readcnt);
-		} while (readcnt == BUFFERLEN);
-	b_close (testfs_fd);
-	close (linux_fd);
-#endif
-	return 0;
+	{
+	case 2: //only one name provided
+		src = argvec[1];
+		dest = src;
+		break;
+
+	case 3:
+		src = argvec[1];
+		dest = argvec[2];
+		break;
+
+	default:
+		printf("Usage: cp2l srcfile [Linuxdestfile]\n");
+		return (-1);
 	}
+
+	testfs_fd = b_open(src, O_RDONLY);
+	linux_fd = open(dest, O_WRONLY | O_CREAT | O_TRUNC);
+	do
+	{
+		readcnt = b_read(testfs_fd, buf, BUFFERLEN);
+		write(linux_fd, buf, readcnt);
+	} while (readcnt == BUFFERLEN);
+	b_close(testfs_fd);
+	close(linux_fd);
+	printf("Copy to Linux complete\n");
+	return 0;
+#endif
+}
 	
 /****************************************************
 *  Copy file from Linux to test file system commmand
@@ -754,7 +891,7 @@ int main (int argc, char * argv[])
 	
 	while (1)
 		{
-		cmdin = readline("Prompt > ");
+		cmdin = readline("2023-SP-CSC-415-FS > ");
 #ifdef COMMAND_DEBUG
 		printf ("%s\n", cmdin);
 #endif
