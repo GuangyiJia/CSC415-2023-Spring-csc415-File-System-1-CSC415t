@@ -34,24 +34,37 @@
 #
 
 
-ROOTNAME=hexdump
+ROOTNAME=fsshell
 HW=
 FOPTION=
-RUNOPTIONS=
+RUNOPTIONS=SampleVolume 10000000 512
 CC=gcc
 CFLAGS= -g -I.
 LIBS =pthread
 DEPS = 
-OBJ = $(ROOTNAME)$(HW)$(FOPTION).o
+# Add any additional objects to this list
+ADDOBJ= fsInit.o
+ARCH = $(shell uname -m)
+
+ifeq ($(ARCH), aarch64)
+	ARCHOBJ=fsLowM1.o
+else
+	ARCHOBJ=fsLow.o
+endif
+
+OBJ = $(ROOTNAME)$(HW)$(FOPTION).o $(ADDOBJ) $(ARCHOBJ)
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) 
 
 $(ROOTNAME)$(HW)$(FOPTION): $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) -l $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) -lm -l readline -l $(LIBS)
 
 clean:
-	rm *.o $(ROOTNAME)$(HW)$(FOPTION)
+	rm $(ROOTNAME)$(HW)$(FOPTION).o $(ADDOBJ) $(ROOTNAME)$(HW)$(FOPTION)
 
 run: $(ROOTNAME)$(HW)$(FOPTION)
 	./$(ROOTNAME)$(HW)$(FOPTION) $(RUNOPTIONS)
+
+vrun: $(ROOTNAME)$(HW)$(FOPTION)
+	valgrind ./$(ROOTNAME)$(HW)$(FOPTION) $(RUNOPTIONS)
