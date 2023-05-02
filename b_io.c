@@ -1,5 +1,5 @@
 /**************************************************************
-* Class:  CSC-415
+* Class:  CSC-415-02 Spring 2023
 * Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
 * Student IDs: 920290979, 920757003, 920875901, 922033512
 * Project: Basic File System 
@@ -171,7 +171,7 @@ int b_seek(b_io_fd fd, off_t offset, int whence)
 		return (-1); // invalid file descriptor
 	}
 
-	printf("fd: %d, offset: %d, whence: %d\n", fd, offset, whence);
+	printf("fd: %d, offset: %ld, whence: %d\n", fd, offset, whence);
 
 	return (0); // Change this
 }

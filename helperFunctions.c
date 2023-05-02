@@ -1,5 +1,5 @@
 /**************************************************************
-* Class:  CSC-415
+* Class:  CSC-415-02 Spring 2023
 * Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
 * Student IDs: 920290979, 920757003, 920875901, 922033512
 * Project: Basic File System 
@@ -80,7 +80,7 @@ uint64_t allocateFreeSpace_Bitmap(uint64_t block_ToBeAllocated)
 
     //Using the first free block index in our VCB can an 
     //efficient way of allocating many files in the volume
-    for (uint64_t b_index = JCJC_VCB->current_FreeBlockIndex; b_index < JCJC_VCB->numberOfBlocks; b_index++)
+    for (uint64_t b_index = JGRD_VCB->current_FreeBlockIndex; b_index < JGRD_VCB->numberOfBlocks; b_index++)
     {
         //Check to see if the bitmap has any available free space 
         if (checkBit(b_index, freespace) == SPACE_IS_FREE)
@@ -111,21 +111,21 @@ uint64_t allocateFreeSpace_Bitmap(uint64_t block_ToBeAllocated)
 
                 //Check if the first free block in our VCB is marked USED
                 //if so, then we need to update it in our VCB
-                if (checkBit(JCJC_VCB->current_FreeBlockIndex, freespace) == SPACE_IN_USED)
+                if (checkBit(JGRD_VCB->current_FreeBlockIndex, freespace) == SPACE_IN_USED)
                 {
                     //Using the last occupied block in our VCB, we check to see if
                     //there are any available free space, if so, then LBAwrite that 
                     //block into our VCB
-                    for (uint64_t k = b_index + 1; k < JCJC_VCB->numberOfBlocks; k++)
+                    for (uint64_t k = b_index + 1; k < JGRD_VCB->numberOfBlocks; k++)
                     {
                         if (checkBit(k, freespace) == SPACE_IS_FREE)
                         {
-                            //Set the new first free block index and update it in JCJC_VCB
+                            //Set the new first free block index and update it in JGRD_VCB
                             // printf("first free block index changes to %ld\n", k);
 
-                            JCJC_VCB->current_FreeBlockIndex = k;
+                            JGRD_VCB->current_FreeBlockIndex = k;
 
-                            LBAwrtie_func(JCJC_VCB, sizeof(volume_ControlBlock), 0);
+                            LBAwrtie_func(JGRD_VCB, sizeof(volume_ControlBlock), 0);
 
                             break;
                         }
@@ -138,11 +138,11 @@ uint64_t allocateFreeSpace_Bitmap(uint64_t block_ToBeAllocated)
                 uint64_t bytes = convertBitToBytes();
 
                 //Write the converted number of bytes into the VCB
-                LBAwrtie_func(freespace, bytes, JCJC_VCB->VCB_blockCount);
+                LBAwrtie_func(freespace, bytes, JGRD_VCB->VCB_blockCount);
 
                 // testing freespace on removing
                 // printf("\nused block index: ");
-                // for (int i = 0; i < JCJC_VCB->numberOfBlocks; i++)
+                // for (int i = 0; i < JGRD_VCB->numberOfBlocks; i++)
                 // {
                 //     if (checkBit(i, freespace) == 1)
                 //     {
@@ -172,8 +172,8 @@ uint64_t allocateFreeSpace_Bitmap(uint64_t block_ToBeAllocated)
 //that can be read by our File System
 int convertBitToBytes()
 {
-    uint64_t bytes = JCJC_VCB->numberOfBlocks / 8;
-    if (JCJC_VCB->numberOfBlocks % 8 > 0)
+    uint64_t bytes = JGRD_VCB->numberOfBlocks / 8;
+    if (JGRD_VCB->numberOfBlocks % 8 > 0)
     {
         bytes++;
     }
