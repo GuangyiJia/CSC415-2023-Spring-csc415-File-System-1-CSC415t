@@ -1,5 +1,5 @@
 /**************************************************************
-* Class:  CSC-415
+* Class:  CSC-415-02 Spring 2023
 * Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
 * Student IDs: 920290979, 920757003, 920875901, 922033512
 * Project: Basic File System 
@@ -118,7 +118,7 @@ int checkContainFile(char * filename);
 int LBAwrtie_func(void * fdDir, uint64_t length, uint64_t startingPosition);
 
 //Global variables for VCB, FreeSpace, and Directory
-volume_ControlBlock * JCJC_VCB;
+volume_ControlBlock * JGRD_VCB;
 fdDir * rootDir; // used for keep opened directory
 int * freespace;
 uint64_t openedDirEntryIndex;

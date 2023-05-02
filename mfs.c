@@ -1,5 +1,5 @@
 /**************************************************************
-* Class:  CSC-415
+* Class:  CSC-415-02 Spring 2023
 * Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
 * Student IDs: 920290979, 920757003, 920875901, 922033512
 * Project: Basic File System 
@@ -465,7 +465,7 @@ int fs_rmdir(const char * pathname)
     path = NULL;
 
     // check if the path we find is the root directory
-    if (target->directoryStartLocation == JCJC_VCB->location_RootDirectory)
+    if (target->directoryStartLocation == JGRD_VCB->location_RootDirectory)
     {
         // if it is the root directory
         // we can not remove the root directory
@@ -603,7 +603,7 @@ fdDir * parseEntry(struct Directory_Entry *entry)
     //Get the block num_BlocksToRelease of this directory entry, and by 
     //using the sizeOf, malloc a temp temp_LBABuffer for entry
     unsigned int fdDir_block_count = getVCB_BlockCount(sizeof(fdDir));
-    char *buffer = malloc(fdDir_block_count * JCJC_VCB->blockSize);
+    char *buffer = malloc(fdDir_block_count * JGRD_VCB->blockSize);
     if (buffer == NULL)
     {
         printf("malloc() on buffer");
@@ -699,7 +699,7 @@ char * get_path_last_slash(char * path)
 //Function to write back data into our volume 
 int LBAwrtie_func(void * fdDir, uint64_t length, uint64_t startingPosition)
 {
-    uint64_t fullBlockSize = getVCB_BlockCount(length) * JCJC_VCB->blockSize;
+    uint64_t fullBlockSize = getVCB_BlockCount(length) * JGRD_VCB->blockSize;
 
     //Malloc a temp_LBABuffer to copy data to 
     char *temp_LBABuffer = malloc(fullBlockSize);
@@ -991,7 +991,7 @@ int fs_stat(const char *path, struct fs_stat *buf)
         {
             //If specified directory exists, then set the 
             //file data into our fs_stat struct 
-            buf->st_blksize = JCJC_VCB->blockSize;
+            buf->st_blksize = JGRD_VCB->blockSize;
             buf->st_size = rootDir->dirEntry[i].fileSize;
             buf->st_blocks = getVCB_BlockCount(buf->st_size);
             buf->st_createtime = rootDir->dirEntry[i].create_time;
@@ -1120,7 +1120,7 @@ char * fs_getcwd(char * pathname, size_t size){
     //Using a while-loop, block_StartPos from the current directory entry and working 
     //backwards, go back up one directory at a time until root location is
     //reached. The result will be the full pure_PathCopy of the directory entry 
-    while(dir_Copy -> directoryStartLocation != JCJC_VCB -> location_RootDirectory){
+    while(dir_Copy -> directoryStartLocation != JGRD_VCB -> location_RootDirectory){
 
         //Using string copy and string concatenation, parse the pure_PathCopy
         //of the dir entry, and seperate each with a "/"
@@ -1197,8 +1197,8 @@ int fs_setcwd(char * pathname){
 //Function to get the block count currenlty stored in our VCB
 unsigned int getVCB_BlockCount(uint64_t bl_number)
 {
-    int result = bl_number / JCJC_VCB->blockSize;
-    if (bl_number % JCJC_VCB->blockSize > 0)
+    int result = bl_number / JGRD_VCB->blockSize;
+    if (bl_number % JGRD_VCB->blockSize > 0)
     {
         result++;
     }
@@ -1210,7 +1210,7 @@ unsigned int getVCB_BlockCount(uint64_t bl_number)
 //Function to get how many bytes are needed from our VCB
 unsigned int getVCB_num_bytes(uint64_t block_count)
 {
-    int result = block_count * JCJC_VCB -> blockSize;
+    int result = block_count * JGRD_VCB -> blockSize;
     return result;
 }
 
@@ -1218,14 +1218,14 @@ unsigned int getVCB_num_bytes(uint64_t block_count)
 int releaseFreespace(uint64_t start, uint64_t count)
 {
     // handle error of invalid count, generally not goint to happen
-    if (start < (JCJC_VCB->freeSpace_BlockCount + JCJC_VCB->VCB_blockCount) ||
+    if (start < (JGRD_VCB->freeSpace_BlockCount + JGRD_VCB->VCB_blockCount) ||
         count < 1 ||
-        start + count > JCJC_VCB->numberOfBlocks)
+        start + count > JGRD_VCB->numberOfBlocks)
     {
         //printf("start: %d, count: %d\n", start, count);
-        printf("JCJC_VCB->freeSpace_BlockCount : %d\n",JCJC_VCB->freeSpace_BlockCount);
-        printf("JCJC_VCB->VCB_blockCount : %d\n",JCJC_VCB->VCB_blockCount);
-        printf("JCJC_VCB->numberOfBlocks : %ld\n",JCJC_VCB->numberOfBlocks);
+        printf("JGRD_VCB->freeSpace_BlockCount : %d\n",JGRD_VCB->freeSpace_BlockCount);
+        printf("JGRD_VCB->VCB_blockCount : %d\n",JGRD_VCB->VCB_blockCount);
+        printf("JGRD_VCB->numberOfBlocks : %ld\n",JGRD_VCB->numberOfBlocks);
         printf("invalid arg in releaseFreespace\n");
         return -2;
     }
@@ -1248,12 +1248,12 @@ int releaseFreespace(uint64_t start, uint64_t count)
     }
 
     // simply compare if the freed block is before the freeblock index
-    if (start < JCJC_VCB->current_FreeBlockIndex)
+    if (start < JGRD_VCB->current_FreeBlockIndex)
     {
-        // set the new first free block index and update JCJC_VCB
+        // set the new first free block index and update JGRD_VCB
         // printf("current free block index changes to %ld\n", start);
-        JCJC_VCB->current_FreeBlockIndex = start;
-        LBAwrtie_func(JCJC_VCB, sizeof(volume_ControlBlock), 0);
+        JGRD_VCB->current_FreeBlockIndex = start;
+        LBAwrtie_func(JGRD_VCB, sizeof(volume_ControlBlock), 0);
     }
 
     // next step: finding free space
@@ -1261,11 +1261,11 @@ int releaseFreespace(uint64_t start, uint64_t count)
     uint64_t bytes = convertBitToBytes();
 
     // starts right behind vcb
-    LBAwrtie_func(freespace, bytes, JCJC_VCB->VCB_blockCount);
+    LBAwrtie_func(freespace, bytes, JGRD_VCB->VCB_blockCount);
 
     // testing freespace on removing
     // printf("\nused block index: ");
-    // for (int i = 0; i < JCJC_VCB->numberOfBlocks; i++)
+    // for (int i = 0; i < JGRD_VCB->numberOfBlocks; i++)
     // {
     //     if (checkBit(i, freespace) == SPACE_IN_USED)
     //     {

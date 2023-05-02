@@ -1,5 +1,5 @@
 /**************************************************************
-* Class:  CSC-415
+* Class:  CSC-415-02 Spring 2023
 * Names: Jaime Guardado, Guangyi Jia, Renee Sewak, Daniel Moorhatch
 * Student IDs: 920290979, 920757003, 920875901, 922033512
 * Project: Basic File System 
@@ -20,19 +20,19 @@
 //function to find out the how many continue freespace we can use 
 int allocateFreeSpace_Bitmap(int block_count_needed)
 {
-    int freespace_start_location = JCJC_VCB->current_FreeBlockIndex;
+    int freespace_start_location = JGRD_VCB->current_FreeBlockIndex;
     int count = 0;
     int j, k;
 
     while(1)
     {
-        for (int i = freespace_start_location; i < JCJC_VCB->numberOfBlocks; i++)
+        for (int i = freespace_start_location; i < JGRD_VCB->numberOfBlocks; i++)
         {
             if (checkBit(i, freespace) == 0) // finding free space
             {
                 count++;
                 // finding next allocated space location
-                for (j = i + 1; j < JCJC_VCB->numberOfBlocks; j++)
+                for (j = i + 1; j < JGRD_VCB->numberOfBlocks; j++)
                 {
                     if (checkBit(j, freespace) != 0)
                     {
@@ -51,7 +51,7 @@ int allocateFreeSpace_Bitmap(int block_count_needed)
         }
         else 
         {
-            for (k = j; k < JCJC_VCB->numberOfBlocks; k++)
+            for (k = j; k < JGRD_VCB->numberOfBlocks; k++)
             {
                 if (checkBit(k, freespace) == 0) // find the allocated file end
                 {
@@ -61,7 +61,7 @@ int allocateFreeSpace_Bitmap(int block_count_needed)
                 }
             }
         }
-        if (k >= JCJC_VCB->numberOfBlocks)
+        if (k >= JGRD_VCB->numberOfBlocks)
         {
             break;
         }       
